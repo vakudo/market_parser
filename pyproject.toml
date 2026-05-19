@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "market-parser"
+version = "0.1.0"
+description = "Daily baby food price collector for Russian retail/e-commerce stores."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "beautifulsoup4>=4.12.0",
+  "google-api-python-client>=2.130.0",
+  "google-auth>=2.30.0",
+  "httpx>=0.27.0",
+  "openpyxl>=3.1.0",
+  "playwright>=1.45.0",
+  "pydantic-settings>=2.3.0",
+  "tenacity>=8.3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.2.0",
+  "pytest-asyncio>=0.23.0",
+  "ruff>=0.5.0",
+]
+
+[project.scripts]
+market-parser = "market_parser.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["market_parser*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
