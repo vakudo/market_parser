@@ -329,6 +329,7 @@ def group_observations(
                 "category": row["category"],
                 "brand": row["brand"],
                 "name": row["name"],
+                "url": row["url"],
                 "observations": observations[key],
             },
         )

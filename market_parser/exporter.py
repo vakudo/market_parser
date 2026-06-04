@@ -12,7 +12,7 @@ from .models import PriceMatrix
 from .normalize import kopecks_to_rubles
 from .storage import Storage, group_observations
 
-BASE_HEADERS = ["Сеть", "Бренд", "Наименование товара", "Рейтинг"]
+BASE_HEADERS = ["Сеть", "Бренд", "Наименование товара", "Ссылка", "Рейтинг"]
 PRICE_HEADERS = [
     "Цена без скидки (регулярная)",
     "Цена со скидкой",
@@ -46,6 +46,7 @@ def build_price_matrix(storage: Storage, start_date: date, end_date: date) -> Pr
             item["store_name"],
             item["brand"],
             item["name"],
+            item.get("url"),
             _latest_rating(observations),
         ]
         for observed_date in dates:
@@ -130,6 +131,8 @@ def _write_matrix_sheet(sheet, matrix: PriceMatrix) -> None:
             cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
     rating_col = len(BASE_HEADERS)
+    link_col = len(BASE_HEADERS) - 1
+    link_font = Font(color="0563C1", underline="single")
     for row_idx, values in enumerate(matrix.rows, start=4):
         for col_idx, value in enumerate(values, start=1):
             cell = sheet.cell(row=row_idx, column=col_idx, value=value)
@@ -138,10 +141,13 @@ def _write_matrix_sheet(sheet, matrix: PriceMatrix) -> None:
             elif col_idx == rating_col:
                 cell.number_format = '0.0'
                 cell.alignment = Alignment(horizontal="center")
+            elif col_idx == link_col and value:
+                cell.hyperlink = str(value)
+                cell.font = link_font
 
     max_col = len(BASE_HEADERS) + len(matrix.dates) * len(PRICE_HEADERS)
     max_row = max(4, len(matrix.rows) + 3)
-    sheet.freeze_panes = "E4"
+    sheet.freeze_panes = f"{get_column_letter(len(BASE_HEADERS) + 1)}4"
     if max_col >= 1:
         sheet.auto_filter.ref = f"A3:{get_column_letter(max_col)}{max_row}"
 
@@ -149,7 +155,8 @@ def _write_matrix_sheet(sheet, matrix: PriceMatrix) -> None:
         1: 22,
         2: 18,
         3: 52,
-        4: 9,
+        4: 48,
+        5: 10,
     }
     for col_idx in range(1, max_col + 1):
         sheet.column_dimensions[get_column_letter(col_idx)].width = widths.get(col_idx, 16)

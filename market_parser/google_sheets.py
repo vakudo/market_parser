@@ -72,7 +72,7 @@ class GoogleSheetsExporter:
                             "addSheet": {
                                 "properties": {
                                     "title": self.config.sheet_name,
-                                    "gridProperties": {"frozenRowCount": 3, "frozenColumnCount": 4},
+                                    "gridProperties": {"frozenRowCount": 3, "frozenColumnCount": len(BASE_HEADERS)},
                                 }
                             }
                         }
@@ -107,11 +107,24 @@ class GoogleSheetsExporter:
     def _apply_formatting(self, sheet_id: int, matrix: PriceMatrix) -> None:
         width = len(BASE_HEADERS) + len(matrix.dates) * len(PRICE_HEADERS)
         requests: list[dict[str, Any]] = [
+            # Drop any merges left over from a previous (differently shaped) sync,
+            # otherwise the new date-header merges collide and the API returns 400.
+            {
+                "unmergeCells": {
+                    "range": {
+                        "sheetId": sheet_id,
+                        "startRowIndex": 1,
+                        "endRowIndex": 3,
+                        "startColumnIndex": 0,
+                        "endColumnIndex": max(width, 1),
+                    }
+                }
+            },
             {
                 "updateSheetProperties": {
                     "properties": {
                         "sheetId": sheet_id,
-                        "gridProperties": {"frozenRowCount": 3, "frozenColumnCount": 4},
+                        "gridProperties": {"frozenRowCount": 3, "frozenColumnCount": len(BASE_HEADERS)},
                     },
                     "fields": "gridProperties.frozenRowCount,gridProperties.frozenColumnCount",
                 }
