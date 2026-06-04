@@ -72,7 +72,10 @@ class GoogleSheetsExporter:
                             "addSheet": {
                                 "properties": {
                                     "title": self.config.sheet_name,
-                                    "gridProperties": {"frozenRowCount": 3, "frozenColumnCount": len(BASE_HEADERS)},
+                                    "gridProperties": {
+                                        "frozenRowCount": 3,
+                                        "frozenColumnCount": len(BASE_HEADERS),
+                                    },
                                 }
                             }
                         }
@@ -124,7 +127,10 @@ class GoogleSheetsExporter:
                 "updateSheetProperties": {
                     "properties": {
                         "sheetId": sheet_id,
-                        "gridProperties": {"frozenRowCount": 3, "frozenColumnCount": len(BASE_HEADERS)},
+                        "gridProperties": {
+                            "frozenRowCount": 3,
+                            "frozenColumnCount": len(BASE_HEADERS),
+                        },
                     },
                     "fields": "gridProperties.frozenRowCount,gridProperties.frozenColumnCount",
                 }

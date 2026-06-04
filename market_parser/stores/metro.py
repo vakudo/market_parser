@@ -96,12 +96,24 @@ def parse_metro_cards(html: str, *, category: str, limit: int | None) -> list[Pr
                 product_id=product_id,
                 regular_price_kopecks=regular,
                 promo_price_kopecks=promo,
+                rating=_metro_rating(card),
                 availability="in_stock",
             )
         )
         if limit is not None and len(products) >= limit:
             break
     return products
+
+
+def _metro_rating(card) -> float | None:
+    node = card.select_one(".product-card-rating__rating")
+    if node is None:
+        return None
+    try:
+        value = float(normalize_text(node.get_text(" ", strip=True)).replace(",", "."))
+    except ValueError:
+        return None
+    return value if 0 < value <= 5 else None
 
 
 def _metro_price(node) -> int | None:

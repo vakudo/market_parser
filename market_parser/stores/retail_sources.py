@@ -747,15 +747,6 @@ def parse_pyaterochka_search_payload(
     return _dedupe(products)
 
 
-def _money_values(text: str) -> list[int]:
-    fragments = re.findall(
-        r"\d[\d\s.,]{0,16}\s*(?:₽|руб\.?|р\.)",
-        normalize_text(text),
-        flags=re.IGNORECASE,
-    )
-    return extract_price_values(" ".join(fragments))
-
-
 def _auchan_price_value(node) -> int | None:
     if node is None:
         return None
@@ -1078,41 +1069,6 @@ class AuchanAdapter(RetailSourceAdapter):
 
 
 
-class BristolAdapter(RetailSourceAdapter):
-    metadata = StoreMetadata(
-        slug="bristol",
-        name="Бристоль",
-        channel="Федеральная сеть",
-        category_url="https://bristol.ru/search/?q=детское%20питание",
-    )
-    source_urls = ("https://bristol.ru/search/?q=детское%20питание", "https://bristol.ru/")
-    browser_fallback = False
-    reader_fallback = False
-    product_href_patterns = (r"/product", r"/catalog")
-
-
-class DaAdapter(RetailSourceAdapter):
-    metadata = StoreMetadata(
-        slug="da",
-        name="ДА!",
-        channel="Дискаунтер",
-        category_url="https://market-da.ru/",
-    )
-    source_urls = (
-        "https://market-da.ru/",
-        "https://market-da.ru/sitemap.html",
-    )
-    browser_fallback = False
-    reader_fallback = False
-    product_href_patterns = (r"/catalog", r"/about")
-
-    async def fetch_category(self, limit: int | None = None) -> list[ProductPrice]:
-        raise StoreAdapterError(
-            "ДА!: публичный онлайн-каталог с текущими товарами и ценами не найден"
-        )
-
-
-
 class DixyAdapter(RetailSourceAdapter):
     metadata = StoreMetadata(
         slug="dixy",
@@ -1215,22 +1171,6 @@ class LentaAdapter(RetailSourceAdapter):
                 await browser.close()
         return products
 
-
-
-class OkeyAdapter(RetailSourceAdapter):
-    metadata = StoreMetadata(
-        slug="okey",
-        name="О'КЕЙ",
-        channel="Федеральная сеть",
-        category_url="https://www.okeydostavka.ru/msk/detskie-tovary-i-igrushki/detskoe-pitanie",
-    )
-    source_urls = (
-        "https://www.okeydostavka.ru/msk/detskie-tovary-i-igrushki/detskoe-pitanie",
-        "https://www.okeydostavka.ru/ekb/detskie-tovary-i-igrushki/detskoe-pitanie",
-    )
-    browser_fallback = False
-    reader_fallback = False
-    product_href_patterns = (r"/product/", r"/products/", r"/detskoe-pitanie")
 
 
 class VkusvillAdapter(RetailSourceAdapter):

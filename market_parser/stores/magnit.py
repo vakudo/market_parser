@@ -8,7 +8,6 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_ex
 
 from market_parser.models import ProductPrice
 from market_parser.normalize import (
-    choose_price_fields,
     extract_price_values,
     guess_brand,
     normalize_text,
@@ -90,9 +89,14 @@ def parse_magnit_cards(html: str, *, category: str, limit: int | None) -> list[P
         if not title:
             continue
         href = str(link.get("href") or "") if link else ""
-        price_box = article.select_one(".unit-catalog-product-preview-prices") or article
-        prices = extract_price_values(price_box.get_text(" ", strip=True))
-        regular, promo, loyalty = choose_price_fields(prices)
+        # Magnit shows the loyalty-card price as the main figure and the
+        # without-card price as the struck-through "sale" figure.
+        current = _magnit_price(article, ".unit-catalog-product-preview-prices__regular")
+        old = _magnit_price(article, ".unit-catalog-product-preview-prices__sale")
+        if old and current and old != current:
+            regular, loyalty = old, current
+        else:
+            regular, loyalty = (current or old), None
         product_id = _magnit_id_from_href(href)
         products.append(
             ProductPrice(
@@ -104,14 +108,34 @@ def parse_magnit_cards(html: str, *, category: str, limit: int | None) -> list[P
                 product_url=urljoin("https://magnit.ru", href),
                 product_id=product_id,
                 regular_price_kopecks=regular,
-                promo_price_kopecks=promo,
+                promo_price_kopecks=None,
                 loyalty_price_kopecks=loyalty,
+                rating=_magnit_rating(article),
                 availability="in_stock",
             )
         )
         if limit is not None and len(products) >= limit:
             break
     return products
+
+
+def _magnit_price(article, selector: str) -> int | None:
+    el = article.select_one(selector)
+    if el is None:
+        return None
+    values = extract_price_values(el.get_text(" ", strip=True))
+    return values[0] if values else None
+
+
+def _magnit_rating(article) -> float | None:
+    el = article.select_one(".unit-catalog-product-preview-rating-score")
+    if el is None:
+        return None
+    try:
+        value = float(normalize_text(el.get_text(" ", strip=True)).replace(",", "."))
+    except ValueError:
+        return None
+    return value if 0 < value <= 5 else None
 
 
 def _magnit_id_from_href(href: str) -> str:

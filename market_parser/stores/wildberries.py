@@ -4,7 +4,7 @@ import asyncio
 from urllib.parse import urlencode
 
 from market_parser.models import ProductPrice
-from market_parser.normalize import KNOWN_BRANDS, guess_brand, normalize_text, wb_units_to_kopecks
+from market_parser.normalize import guess_brand, normalize_text, wb_units_to_kopecks
 from market_parser.stores.base import (
     BaseStoreAdapter,
     StoreAdapterError,
@@ -17,46 +17,6 @@ EXCLUDED_SUBJECT_IDS = {
     "2647",  # Питание для кормящих и беременных, not baby food.
     "7625",  # Соусы детские is noisy in WB and often contains adult sauces.
 }
-
-BABY_CONTEXT_MARKERS = (
-    "детск",
-    "детям",
-    "ребен",
-    "ребён",
-    "малыш",
-    "младен",
-    "грудн",
-    "месяц",
-    "мес",
-    "с рождения",
-)
-
-CORE_BABY_FOOD_MARKERS = (
-    "смесь",
-    "каша",
-    "молочко",
-    "пюре",
-)
-
-GENERAL_FOOD_MARKERS = (
-    "сок",
-    "нектар",
-    "компот",
-    "кисель",
-    "морс",
-    "смузи",
-    "вода",
-    "печенье",
-    "батончик",
-    "макарон",
-    "суп",
-    "чай",
-    "кефир",
-    "творог",
-    "йогурт",
-    "молоко",
-    "пауч",
-)
 
 NON_BABY_FOOD_MARKERS = (
     "для кош",
@@ -79,8 +39,6 @@ NON_BABY_FOOD_MARKERS = (
     "спортив",
     "фитнес",
 )
-
-TRUSTED_BABY_BRANDS = {brand.casefold() for brand in KNOWN_BRANDS}
 
 
 class WildberriesAdapter(BaseStoreAdapter):
@@ -437,13 +395,6 @@ def _brand_from_item(item: dict, name: str) -> str:
     if quoted:
         return quoted
     return "Не указан WB"
-
-
-def _has_trusted_baby_brand(item: dict, text: str) -> bool:
-    brand = normalize_text(str(item.get("brand") or "")).casefold()
-    if brand and brand in TRUSTED_BABY_BRANDS:
-        return True
-    return any(known_brand in text for known_brand in TRUSTED_BABY_BRANDS)
 
 
 def _quoted_leading_brand(name: str) -> str:
