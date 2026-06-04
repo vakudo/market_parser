@@ -1251,6 +1251,7 @@ class VkusvillAdapter(RetailSourceAdapter):
 
 
 class OnlinetradeAdapter(RetailSourceAdapter):
+    auto_runnable = False  # collected manually via run_logs/cdp_ot_collect.py
     metadata = StoreMetadata(
         slug="onlinetrade",
         name="Онлайнтрейд.ру",
@@ -1267,6 +1268,7 @@ class OnlinetradeAdapter(RetailSourceAdapter):
 
 
 class SamokatAdapter(RetailSourceAdapter):
+    auto_runnable = False  # collected manually via run_logs/cdp_collect.py
     metadata = StoreMetadata(
         slug="samokat",
         name="Самокат",
@@ -1280,6 +1282,7 @@ class SamokatAdapter(RetailSourceAdapter):
 
 
 class PerekrestokAdapter(RetailSourceAdapter):
+    auto_runnable = False  # collected manually via run_logs/cdp_pk_collect.py
     metadata = StoreMetadata(
         slug="perekrestok",
         name="Перекрёсток",

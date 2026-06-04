@@ -6,7 +6,13 @@ from datetime import date
 
 from .config import Settings
 from .exporter import export_monthly_xlsx, last_n_days_range
-from .runner import available_store_slugs, run_and_export, run_async, sync_google_last_days
+from .runner import (
+    auto_store_slugs,
+    available_store_slugs,
+    run_and_export,
+    run_async,
+    sync_google_last_days,
+)
 from .storage import Storage
 from .stores import list_stores
 
@@ -20,6 +26,11 @@ def main(argv: list[str] | None = None) -> None:
 
     run_parser = subparsers.add_parser("run", help="Collect prices and export outputs")
     run_parser.add_argument("--stores", help="Comma-separated store slugs")
+    run_parser.add_argument(
+        "--auto",
+        action="store_true",
+        help="Run only auto-runnable stores (skips CDP/manual ones). Used by the daily job.",
+    )
     run_parser.add_argument("--limit", type=int, help="Max products per store")
     run_parser.add_argument("--dry-run", action="store_true", help="Do not write DB/XLSX/Google")
     run_parser.add_argument("--no-xlsx", action="store_true", help="Skip XLSX export")
@@ -49,6 +60,8 @@ def main(argv: list[str] | None = None) -> None:
 
     if args.command == "run":
         selected = _parse_stores(args.stores)
+        if selected is None and args.auto:
+            selected = auto_store_slugs()
         results, xlsx_path, google_status = run_async(
             run_and_export(
                 settings,

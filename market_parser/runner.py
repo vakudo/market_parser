@@ -148,6 +148,15 @@ def available_store_slugs() -> list[str]:
     return sorted(STORE_ADAPTERS)
 
 
+def auto_store_slugs() -> list[str]:
+    """Stores that can run unattended (excludes CDP/manual-only ones)."""
+    return [
+        slug
+        for slug in sorted(STORE_ADAPTERS)
+        if getattr(STORE_ADAPTERS[slug], "auto_runnable", True)
+    ]
+
+
 def local_now(settings: Settings):
     from datetime import datetime
 

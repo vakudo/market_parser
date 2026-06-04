@@ -32,6 +32,9 @@ class StoreMetadata:
 class BaseStoreAdapter(ABC):
     metadata: StoreMetadata
     requires_network: bool = True
+    # False for stores that can only be collected manually (e.g. via the CDP
+    # real-browser flow), so the daily automated run skips them.
+    auto_runnable: bool = True
 
     def __init__(self, settings: Settings):
         self.settings = settings
