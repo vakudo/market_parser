@@ -3,16 +3,46 @@ from __future__ import annotations
 from market_parser.config import Settings
 from market_parser.stores.base import BaseStoreAdapter
 from market_parser.stores.detmir import DetmirAdapter
+from market_parser.stores.komus import KomusAdapter
+from market_parser.stores.magnit import MagnitAdapter
+from market_parser.stores.metro import MetroAdapter
 from market_parser.stores.ozon import OzonAdapter
+from market_parser.stores.retail_sources import (
+    AuchanAdapter,
+    ChizhikAdapter,
+    DixyAdapter,
+    KrasnoeBeloeAdapter,
+    LentaAdapter,
+    OnlinetradeAdapter,
+    PerekrestokAdapter,
+    PyaterochkaAdapter,
+    SamokatAdapter,
+    VkusvillAdapter,
+    YandexLavkaAdapter,
+)
 from market_parser.stores.vprok import VprokAdapter
 from market_parser.stores.wildberries import WildberriesAdapter
 from market_parser.stores.yandex_market import YandexMarketAdapter
 
 STORE_ADAPTERS: dict[str, type[BaseStoreAdapter]] = {
-    "ozon": OzonAdapter,
-    "wildberries": WildberriesAdapter,
+    "auchan": AuchanAdapter,
+    "chizhik": ChizhikAdapter,
     "detmir": DetmirAdapter,
+    "dixy": DixyAdapter,
+    "komus": KomusAdapter,
+    "krasnoe_beloe": KrasnoeBeloeAdapter,
+    "lenta": LentaAdapter,
+    "magnit": MagnitAdapter,
+    "metro": MetroAdapter,
+    "onlinetrade": OnlinetradeAdapter,
+    "ozon": OzonAdapter,
+    "perekrestok": PerekrestokAdapter,
+    "pyaterochka": PyaterochkaAdapter,
+    "samokat": SamokatAdapter,
     "vprok": VprokAdapter,
+    "vkusvill": VkusvillAdapter,
+    "wildberries": WildberriesAdapter,
+    "yandex_lavka": YandexLavkaAdapter,
     "yandex_market": YandexMarketAdapter,
 }
 
@@ -26,4 +56,4 @@ def create_adapter(slug: str, settings: Settings) -> BaseStoreAdapter:
 
 
 def list_stores() -> list[tuple[str, str]]:
-    return [(slug, adapter.metadata.name) for slug, adapter in STORE_ADAPTERS.items()]
+    return [(slug, STORE_ADAPTERS[slug].metadata.name) for slug in sorted(STORE_ADAPTERS)]

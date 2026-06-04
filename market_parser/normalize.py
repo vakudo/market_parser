@@ -19,8 +19,16 @@ SPACE_TRANSLATION = str.maketrans(
 PRICE_RE = re.compile(r"\d[\d\s.,]*")
 
 KNOWN_BRANDS = [
+    "Nestle HealthScience",
     "Бабушкино Лукошко",
     "Когда я вырасту",
+    "Черноголовка Бэйби",
+    "Черноголовка",
+    "Святой Источник",
+    "Маленькое счастье",
+    "Сады Придонья",
+    "Fleur Alpine",
+    "Флёр Альпин",
     "ФрутоНяня",
     "Nutrilon",
     "Nestogen",
@@ -44,7 +52,167 @@ KNOWN_BRANDS = [
     "Nutrilak",
     "Friso",
     "Сады Придонья",
+    "BabyGo",
+    "Bebivita",
+    "Neocate",
+    "Gipopo",
+    "Бибиколь",
+    "Bekari",
+    "BEKARI",
+    "Vulcanica",
+    "VULCANICA BABY",
+    "Айдиго",
+    "Amarancho",
+    "Hydroniq",
+    "Pasta la Bella",
+    "LateMa",
+    "Дары Кубани",
+    "Сладкая сказка",
+    "Фанни Ямми",
+    "Егор Иваныч",
+    "Ам-Ам",
+    "Фиксики",
+    "Ладушки",
+    "ЛАДУШКИ",
+    "Малоежка",
+    "Goattiny",
+    "MAMAKO",
+    "KOZЯ",
+    "Фрумка",
+    "Mamelle",
+    "Resource",
+    "PEPTAMEN",
+    "Optifast",
+    "Нутрилак",
+    "Нутриция",
+    "Малышам",
+    "Малыш",
+    "Фитоша",
+    "Винни",
+    "Фруто",
+    "V.O.D.A.",
+    "Растишка",
+    "Калинов Родничок",
+    "Каспер",
+    "Бонди",
+    "Здоровейка",
+    "Нутрини",
+    "Nutrinidrink",
+    "Nutridrink",
+    "Actimuno",
+    "Имунеле",
+    "Нэнни",
+    "Take a Bite",
+    "Take",
+    "Bergen",
+    "ФЯ",
+    "Freddi",
+    "Kinder",
+    "Choco Pie",
+    "ORION",
+    "Конфитрейд",
+    "Профессор Травкин",
 ]
+
+GENERIC_LEADING_WORDS = {
+    "батончик",
+    "безалкогольный",
+    "безмолочная",
+    "бисквитное",
+    "белковый",
+    "бананом",
+    "в",
+    "вафли",
+    "витамины-кальций",
+    "вкусом",
+    "вода",
+    "воздушный",
+    "готовая",
+    "готовое",
+    "готовый",
+    "восстанавливающий",
+    "газированный",
+    "гранола",
+    "груша",
+    "десерт",
+    "детская",
+    "детские",
+    "детский",
+    "детское",
+    "детей",
+    "для",
+    "диетическое",
+    "диетического",
+    "звездочки",
+    "каша",
+    "кашка",
+    "кисель",
+    "кисломолочный",
+    "коктейль",
+    "компот",
+    "консервы",
+    "кукурузные",
+    "кусочки",
+    "лечебное",
+    "из",
+    "и",
+    "лавки",
+    "макароны",
+    "мини-пирожные",
+    "молочная",
+    "молочные",
+    "молочко",
+    "молочный",
+    "морс",
+    "напиток",
+    "нектар",
+    "малины",
+    "малиной",
+    "новогоднее",
+    "на",
+    "быстрого",
+    "печенье",
+    "палочки",
+    "пастила",
+    "пастилки",
+    "пирожное",
+    "питание",
+    "приготовления",
+    "продукт",
+    "продукты",
+    "рисовые",
+    "раннего",
+    "с",
+    "подушечки",
+    "полезный",
+    "пюре",
+    "сливочное",
+    "смесь",
+    "со",
+    "сбалансированное",
+    "специализированная",
+    "специализированное",
+    "сок",
+    "сухая",
+    "сухой",
+    "творог",
+    "хлебцы",
+    "чипсы",
+    "энтеральное",
+    "яблока",
+    "яблоко-киви-банан",
+    "йогурт",
+    "фиточай",
+    "фреш",
+    "фрикадельки",
+    "фруктовая",
+    "фруктовые",
+    "хлебные",
+    "чай",
+    "чоко",
+    "чоко-пай",
+    "шарики",
+}
 
 
 def normalize_text(value: str | None) -> str:
@@ -69,10 +237,6 @@ def parse_price_to_kopecks(value: str | int | float | Decimal | None) -> int | N
         return None
     matches = extract_price_values(text)
     return matches[0] if matches else None
-
-
-def rubles_to_kopecks(value: str | int | float | Decimal | None) -> int | None:
-    return parse_price_to_kopecks(value)
 
 
 def wb_units_to_kopecks(value: int | None) -> int | None:
@@ -160,11 +324,21 @@ def guess_brand(product_name: str) -> str:
     if not name:
         return ""
     folded = name.casefold()
-    for brand in KNOWN_BRANDS:
-        if re.search(rf"(^|\s){re.escape(brand.casefold())}($|\s|[,.])", folded):
+    for brand in sorted(KNOWN_BRANDS, key=len, reverse=True):
+        if brand.casefold() in folded:
             return brand
-    first = name.split(" ", 1)[0].strip("«»\"'.,")
-    return first
+    tokens = re.findall(r"[A-Za-zА-Яа-яЁё0-9][A-Za-zА-Яа-яЁё0-9-]*", name)
+    for token in tokens:
+        cleaned = token.strip("«»\"'.,")
+        if cleaned.casefold() in GENERIC_LEADING_WORDS:
+            continue
+        if _looks_like_brand_token(cleaned):
+            return cleaned
+    return ""
+
+
+def _looks_like_brand_token(token: str) -> bool:
+    return any(ch.isupper() for ch in token)
 
 
 def product_key(store_slug: str, product_id: str | None, product_url: str | None, name: str) -> str:

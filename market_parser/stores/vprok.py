@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from market_parser.stores.base import StoreMetadata
-from market_parser.stores.browser import fetch_rendered_html
 from market_parser.stores.generic_browser import GenericBrowserStoreAdapter
 from market_parser.stores.html_extractors import parse_vprok_cards
+from market_parser.stores.retail_sources import _camoufox_get_html
 
 
 class VprokAdapter(GenericBrowserStoreAdapter):
@@ -17,14 +17,16 @@ class VprokAdapter(GenericBrowserStoreAdapter):
 
     async def fetch_category(self, limit: int | None = None):
         effective_limit = self.effective_limit(limit)
-        html = await self._fetch_html()
+        # vprok.ru challenges plain Playwright/Chromium; Camoufox passes it.
+        html = await _camoufox_get_html(
+            self.metadata.category_url,
+            self.settings,
+            wait_ms=9_000,
+            scroll_steps=8,
+            attempts=2,
+        )
         return parse_vprok_cards(
             html,
             category=self.settings.category_name,
             limit=effective_limit,
         )
-
-    async def _fetch_html(self) -> str:
-        if not self.settings.use_browser:
-            return await super()._fetch_html()
-        return await fetch_rendered_html(self.metadata.category_url, self.settings, wait_ms=10000)

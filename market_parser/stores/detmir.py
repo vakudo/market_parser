@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import asyncio
-import re
 from urllib.parse import urljoin
 
 import httpx
@@ -24,18 +22,17 @@ class DetmirAdapter(BaseStoreAdapter):
         effective_limit = self.effective_limit(limit)
         products: list[ProductPrice] = []
         page = 1
-        max_pages = 100
         async with httpx.AsyncClient(
             timeout=self.settings.request_timeout_seconds,
             headers={"User-Agent": self.settings.user_agent, "Accept-Language": "ru-RU,ru;q=0.9"},
             follow_redirects=True,
         ) as client:
-            while len(products) < effective_limit and page <= max_pages:
+            while not self.limit_reached(len(products), effective_limit):
                 html = await self._fetch_page(client, page)
                 page_items = parse_detmir_cards(
                     html,
                     category=self.settings.category_name,
-                    limit=effective_limit - len(products),
+                    limit=self.remaining_limit(len(products), effective_limit),
                 )
                 if not page_items:
                     break
@@ -48,7 +45,7 @@ class DetmirAdapter(BaseStoreAdapter):
                     break
                 products.extend(new_items)
                 page += 1
-                await asyncio.sleep(self.settings.page_delay_seconds)
+                await self.polite_page_delay()
         return products
 
     @retry(
@@ -66,7 +63,3 @@ class DetmirAdapter(BaseStoreAdapter):
         response = await client.get(url)
         response.raise_for_status()
         return response.text
-
-    @staticmethod
-    def _has_next_page(html: str, page: int) -> bool:
-        return bool(re.search(rf"[?&]page={page + 1}\b", html))

@@ -12,3 +12,6 @@ playwright-report/
 test-results/
 service-account*.json
 google-service-account*.json
+google-sa.json
+*-sa.json
+run_logs/

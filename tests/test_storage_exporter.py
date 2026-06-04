@@ -82,6 +82,51 @@ def test_export_monthly_xlsx_creates_date_blocks(tmp_path) -> None:
     assert "E2:G2" in [str(rng) for rng in sheet.merged_cells.ranges]
 
 
+def test_export_has_rating_column_and_single_sheet(tmp_path) -> None:
+    storage = Storage(tmp_path / "prices.sqlite")
+    storage.init_db()
+    run_id = storage.start_run(["ozon"])
+    storage.save_prices(
+        [
+            ProductPrice(
+                store_slug="ozon",
+                store_name="Озон",
+                category="Детское питание",
+                brand="NAN",
+                product_name="Детская смесь NAN, 800г",
+                product_url="https://www.ozon.ru/product/1",
+                product_id="1",
+                regular_price_kopecks=207900,
+                loyalty_price_kopecks=188000,
+                rating=4.9,
+                collected_at=datetime(2026, 5, 19, 6, 0, tzinfo=UTC),
+            )
+        ],
+        run_id=run_id,
+    )
+
+    matrix = build_price_matrix(
+        storage,
+        datetime(2026, 5, 1, tzinfo=UTC).date(),
+        datetime(2026, 5, 31, tzinfo=UTC).date(),
+    )
+    # base columns are now [Сеть, Бренд, Наименование, Рейтинг]
+    assert matrix.rows[0][1] == "NAN"
+    assert matrix.rows[0][3] == 4.9
+
+    output = export_monthly_xlsx(storage, tmp_path / "exports", "2026-05")
+    workbook = load_workbook(output)
+    assert workbook.sheetnames == ["Выгрузка"]
+    sheet = workbook["Выгрузка"]
+    assert sheet["B3"].value == "Бренд"
+    assert sheet["C3"].value == "Наименование товара"
+    assert sheet["D3"].value == "Рейтинг"
+    assert sheet["D4"].value == 4.9
+    # the "Категория" column must be gone
+    header_row = [cell.value for cell in sheet[3]]
+    assert "Категория" not in header_row
+
+
 def test_build_sheet_values_includes_date_row(tmp_path) -> None:
     storage = Storage(tmp_path / "prices.sqlite")
     storage.init_db()

@@ -16,12 +16,17 @@ class Settings(BaseSettings):
     db_path: Path = Field(default=Path("data/market_parser.sqlite"))
     export_dir: Path = Field(default=Path("exports"))
     timezone: str = "Europe/Moscow"
-    region_name: str = "Москва, центр"
     category_name: str = "Детское питание"
-    max_items_per_store: int = 2000
     use_browser: bool = True
     request_timeout_seconds: float = 30.0
-    page_delay_seconds: float = 0.6
+    page_delay_seconds: float = 2.0
+    page_delay_jitter_seconds: float = 0.75
+    store_delay_seconds: float = 15.0
+    browser_headless: bool = True
+    browser_proxy_server: str | None = None
+    browser_proxy_username: str | None = None
+    browser_proxy_password: str | None = None
+    browser_storage_state_dir: Path = Field(default=Path("data/browser_states"))
     user_agent: str = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "

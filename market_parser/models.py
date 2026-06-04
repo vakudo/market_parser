@@ -21,6 +21,7 @@ class ProductPrice:
     regular_price_kopecks: int | None
     promo_price_kopecks: int | None = None
     loyalty_price_kopecks: int | None = None
+    rating: float | None = None
     currency: str = "RUB"
     availability: str = "unknown"
     status: str = "ok"
@@ -39,6 +40,7 @@ class StoreRunResult:
     count: int
     status: str
     error: str | None = None
+    duration_seconds: float | None = None
 
 
 @dataclass(frozen=True)

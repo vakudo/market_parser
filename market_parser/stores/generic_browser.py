@@ -6,7 +6,7 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_ex
 from market_parser.models import ProductPrice
 from market_parser.stores.base import BaseStoreAdapter, StoreAdapterError, StoreMetadata
 from market_parser.stores.browser import fetch_rendered_html
-from market_parser.stores.html_extractors import parse_generic_product_cards
+from market_parser.stores.html_extractors import ensure_not_blocked, parse_generic_product_cards
 
 
 class GenericBrowserStoreAdapter(BaseStoreAdapter):
@@ -46,6 +46,14 @@ class GenericBrowserStoreAdapter(BaseStoreAdapter):
                 response.raise_for_status()
                 html = response.text
                 if len(html) > 5000:
+                    try:
+                        ensure_not_blocked(html, self.metadata.name)
+                    except StoreAdapterError:
+                        if not self.settings.use_browser:
+                            raise
+                    else:
+                        return html
+                elif not self.settings.use_browser:
                     return html
         except httpx.HTTPError:
             if not self.settings.use_browser:

@@ -23,14 +23,23 @@ ANTI_BOT_MARKERS = [
     "id запроса к ресурсу",
     "access denied",
     "доступ ограничен",
+    "вы не робот",
+    "проблемы со связью",
+    "servicepipe",
+    "qrator",
+    "smartcaptcha",
+    "antibot challenge page",
+    "captcha-api.yandex",
 ]
 
 
 def ensure_not_blocked(html: str, store_name: str) -> None:
+    if _looks_like_catalog(html):
+        return
     lowered = normalize_text(html).lower()
     if any(marker in lowered for marker in ANTI_BOT_MARKERS):
         raise StoreBlockedError(f"{store_name}: anti-bot or captcha page returned")
-    if "captcha" in lowered and not _looks_like_catalog(html):
+    if "captcha" in lowered:
         raise StoreBlockedError(f"{store_name}: anti-bot or captcha page returned")
 
 
@@ -42,6 +51,8 @@ def _looks_like_catalog(html: str) -> bool:
             "application/ld+json",
             "data-testid=\"product",
             "/product/",
+            "/good/",
+            "schema.org/Product",
         )
     )
 
@@ -50,7 +61,7 @@ def parse_detmir_cards(
     html: str,
     *,
     category: str,
-    limit: int,
+    limit: int | None,
 ) -> list[ProductPrice]:
     ensure_not_blocked(html, "Детский мир")
     soup = BeautifulSoup(html, "html.parser")
@@ -90,7 +101,7 @@ def parse_detmir_cards(
                 availability="in_stock",
             )
         )
-        if len(items) >= limit:
+        if limit is not None and len(items) >= limit:
             break
     return items
 
@@ -99,7 +110,7 @@ def parse_vprok_cards(
     html: str,
     *,
     category: str,
-    limit: int,
+    limit: int | None,
 ) -> list[ProductPrice]:
     ensure_not_blocked(html, "Перекресток ВПРОК")
     soup = BeautifulSoup(html, "html.parser")
@@ -140,9 +151,57 @@ def parse_vprok_cards(
                 availability="in_stock",
             )
         )
-        if len(items) >= limit:
+        if limit is not None and len(items) >= limit:
             break
     return items
+
+
+def parse_yandex_market_cards(
+    html: str,
+    *,
+    category: str,
+    limit: int | None,
+) -> list[ProductPrice]:
+    ensure_not_blocked(html, "Яндекс.Маркет")
+    soup = BeautifulSoup(html, "html.parser")
+    items: list[ProductPrice] = []
+
+    for node in soup.select('[data-baobab-name="productSnippet"]'):
+        candidate = None
+        for payload in _extract_json_objects(node.get_text(" ", strip=True), '{"widgets"'):
+            candidate = _find_yandex_offer(payload)
+            if candidate:
+                break
+        if not candidate:
+            continue
+        title = normalize_text(str(candidate.get("title") or ""))
+        if not title:
+            continue
+        href_node = node.select_one('a[href*="/card/"]')
+        href = href_node.get("href") if href_node else ""
+        current = _yandex_price_value(candidate.get("price"))
+        old = _yandex_price_value(candidate.get("oldPrice"))
+        regular = old if old else current
+        promo = current if old and current else None
+        items.append(
+            ProductPrice(
+                store_slug="yandex_market",
+                store_name="Яндекс.Маркет",
+                category=category,
+                brand=guess_brand(title),
+                product_name=title,
+                product_url=urljoin("https://market.yandex.ru", href),
+                product_id=str(
+                    candidate.get("skuId") or candidate.get("productId") or _id_from_href(href)
+                ),
+                regular_price_kopecks=regular,
+                promo_price_kopecks=promo,
+                availability="in_stock" if candidate.get("isAvailable", True) else "unknown",
+            )
+        )
+        if limit is not None and len(items) >= limit:
+            break
+    return _dedupe(items)
 
 
 def parse_json_ld_products(
@@ -199,7 +258,7 @@ def parse_generic_product_cards(
     category: str,
     base_url: str,
     product_href_patterns: Iterable[str],
-    limit: int,
+    limit: int | None,
 ) -> list[ProductPrice]:
     ensure_not_blocked(html, store_name)
     products = parse_json_ld_products(
@@ -209,7 +268,7 @@ def parse_generic_product_cards(
         category=category,
         base_url=base_url,
     )
-    if len(products) >= limit:
+    if limit is not None and len(products) >= limit:
         return _dedupe(products)[:limit]
 
     soup = BeautifulSoup(html, "html.parser")
@@ -222,7 +281,7 @@ def parse_generic_product_cards(
         if len(title) < 8:
             continue
         container_text = _nearby_card_text(anchor)
-        prices = extract_price_values(container_text)
+        prices = extract_price_values(_money_context(container_text))
         if not prices:
             continue
         regular, promo, loyalty = choose_price_fields(
@@ -247,9 +306,54 @@ def parse_generic_product_cards(
             )
         )
         products = _dedupe(products)
-        if len(products) >= limit:
+        if limit is not None and len(products) >= limit:
             break
-    return _dedupe(products)[:limit]
+    products = _dedupe(products)
+    return products[:limit] if limit is not None else products
+
+
+def _extract_json_objects(text: str, marker: str):
+    decoder = json.JSONDecoder()
+    offset = 0
+    while True:
+        start = text.find(marker, offset)
+        if start < 0:
+            return
+        try:
+            value, end = decoder.raw_decode(text[start:])
+        except json.JSONDecodeError:
+            offset = start + len(marker)
+            continue
+        if isinstance(value, dict):
+            yield value
+        offset = start + max(end, len(marker))
+
+
+def _find_yandex_offer(value) -> dict | None:
+    if isinstance(value, dict):
+        if value.get("title") and isinstance(value.get("price"), dict):
+            price = value["price"]
+            if price.get("value"):
+                return value
+        for child in value.values():
+            found = _find_yandex_offer(child)
+            if found:
+                return found
+    elif isinstance(value, list):
+        for child in value:
+            found = _find_yandex_offer(child)
+            if found:
+                return found
+    return None
+
+
+def _yandex_price_value(value) -> int | None:
+    if not isinstance(value, dict):
+        return None
+    price = value.get("value")
+    if price is None:
+        return None
+    return int(float(str(price).replace(",", ".")) * 100)
 
 
 def _iter_json_ld_products(data):
@@ -287,6 +391,15 @@ def _nearby_card_text(anchor) -> str:
             if len(text) < 2500:
                 return text
     return normalize_text(anchor.get_text(" ", strip=True))
+
+
+def _money_context(text: str) -> str:
+    fragments = re.findall(
+        r"\d[\d\s.,]{0,16}\s*(?:₽|руб\.?|р\.|в‚Ѕ|СЂСѓР±)",
+        normalize_text(text),
+        flags=re.IGNORECASE,
+    )
+    return " ".join(fragments) if fragments else text
 
 
 def _id_from_href(href: str) -> str:

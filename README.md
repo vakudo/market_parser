@@ -4,7 +4,7 @@
 
 ## Что реализовано
 
-- 5 магазинов первой версии: `ozon`, `wildberries`, `detmir`, `vprok`, `yandex_market`.
+- 7 рабочих магазинов: `detmir`, `magnit`, `metro`, `ozon`, `vprok`, `wildberries`, `yandex_market`.
 - SQLite как полный архив.
 - Месячные XLSX в формате блоков по датам.
 - Google Sheets-витрина последних 30 дней через service account.

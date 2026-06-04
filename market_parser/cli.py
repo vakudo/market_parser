@@ -61,6 +61,8 @@ def main(argv: list[str] | None = None) -> None:
         )
         for result in results:
             line = f"{result.store_slug}: {result.status}, {result.count} products"
+            if result.duration_seconds is not None:
+                line += f", {result.duration_seconds:.2f}s"
             if result.error:
                 line += f", error={result.error}"
             print(line)

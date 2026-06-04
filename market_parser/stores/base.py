@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import random
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
@@ -15,6 +17,10 @@ class StoreBlockedError(StoreAdapterError):
     pass
 
 
+class StoreRateLimitedError(StoreAdapterError):
+    pass
+
+
 @dataclass(frozen=True)
 class StoreMetadata:
     slug: str
@@ -25,6 +31,7 @@ class StoreMetadata:
 
 class BaseStoreAdapter(ABC):
     metadata: StoreMetadata
+    requires_network: bool = True
 
     def __init__(self, settings: Settings):
         self.settings = settings
@@ -33,5 +40,17 @@ class BaseStoreAdapter(ABC):
     async def fetch_category(self, limit: int | None = None) -> list[ProductPrice]:
         raise NotImplementedError
 
-    def effective_limit(self, limit: int | None) -> int:
-        return limit or self.settings.max_items_per_store
+    def effective_limit(self, limit: int | None) -> int | None:
+        return limit
+
+    def limit_reached(self, count: int, limit: int | None) -> bool:
+        return limit is not None and count >= limit
+
+    def remaining_limit(self, count: int, limit: int | None) -> int | None:
+        if limit is None:
+            return None
+        return max(limit - count, 0)
+
+    async def polite_page_delay(self) -> None:
+        jitter = random.uniform(0, self.settings.page_delay_jitter_seconds)
+        await asyncio.sleep(self.settings.page_delay_seconds + jitter)

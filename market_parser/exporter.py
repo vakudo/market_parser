@@ -12,37 +12,11 @@ from .models import PriceMatrix
 from .normalize import kopecks_to_rubles
 from .storage import Storage, group_observations
 
-BASE_HEADERS = ["Сеть", "Категория", "Бренд", "Наименование товара"]
+BASE_HEADERS = ["Сеть", "Бренд", "Наименование товара", "Рейтинг"]
 PRICE_HEADERS = [
     "Цена без скидки (регулярная)",
     "Цена со скидкой",
     "Цена по карте лояльности",
-]
-
-ALL_STORES = [
-    ("Федеральная сеть", "Перекресток"),
-    ("Федеральная сеть", "Пятерочка"),
-    ("Федеральная сеть", "Чижик"),
-    ("Федеральная сеть", "Ашан (АТАК)"),
-    ("Федеральная сеть", "Бристоль"),
-    ("Федеральная сеть", "Да"),
-    ("Федеральная сеть", "Детский мир"),
-    ("Федеральная сеть", "Дикси"),
-    ("Федеральная сеть", "Красное и белое"),
-    ("Федеральная сеть", "Лента"),
-    ("Федеральная сеть", "Магнит"),
-    ("Федеральная сеть", "Метро (РЕАЛ)"),
-    ("Федеральная сеть", "Окей"),
-    ("Е-ком", "Вайлдберриз"),
-    ("Е-ком", "ВКУСВИЛЛ"),
-    ("Е-ком", "Казань Экспресс"),
-    ("Е-ком", "Комус"),
-    ("Е-ком", "Озон"),
-    ("Е-ком", "Онлайнтрейд.ру"),
-    ("Е-ком", "Самокат"),
-    ("Е-ком", "Перекресток ВПРОК"),
-    ("Е-ком", "Яндекс.Лавка"),
-    ("Е-ком", "Яндекс.Маркет"),
 ]
 
 
@@ -67,13 +41,13 @@ def build_price_matrix(storage: Storage, start_date: date, end_date: date) -> Pr
 
     matrix_rows: list[list[Any]] = []
     for item in grouped.values():
+        observations = item["observations"]
         row: list[Any] = [
             item["store_name"],
-            item["category"],
             item["brand"],
             item["name"],
+            _latest_rating(observations),
         ]
-        observations = item["observations"]
         for observed_date in dates:
             obs = observations.get(observed_date.isoformat())
             if not obs:
@@ -89,6 +63,14 @@ def build_price_matrix(storage: Storage, start_date: date, end_date: date) -> Pr
         matrix_rows.append(row)
 
     return PriceMatrix(dates=dates, rows=matrix_rows)
+
+
+def _latest_rating(observations: dict[str, Any]) -> float | None:
+    for observed_date in sorted(observations, reverse=True):
+        rating = observations[observed_date].get("rating")
+        if rating is not None:
+            return rating
+    return None
 
 
 def build_sheet_values(matrix: PriceMatrix) -> list[list[Any]]:
@@ -115,7 +97,6 @@ def export_monthly_xlsx(storage: Storage, export_dir: Path | str, month: str) ->
     sheet = workbook.active
     sheet.title = "Выгрузка"
     _write_matrix_sheet(sheet, matrix)
-    _write_stores_sheet(workbook)
     workbook.save(output_path)
     return output_path
 
@@ -148,11 +129,15 @@ def _write_matrix_sheet(sheet, matrix: PriceMatrix) -> None:
             cell.font = subheader_font
             cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
+    rating_col = len(BASE_HEADERS)
     for row_idx, values in enumerate(matrix.rows, start=4):
         for col_idx, value in enumerate(values, start=1):
             cell = sheet.cell(row=row_idx, column=col_idx, value=value)
             if col_idx > len(BASE_HEADERS):
                 cell.number_format = '#,##0.00'
+            elif col_idx == rating_col:
+                cell.number_format = '0.0'
+                cell.alignment = Alignment(horizontal="center")
 
     max_col = len(BASE_HEADERS) + len(matrix.dates) * len(PRICE_HEADERS)
     max_row = max(4, len(matrix.rows) + 3)
@@ -161,25 +146,12 @@ def _write_matrix_sheet(sheet, matrix: PriceMatrix) -> None:
         sheet.auto_filter.ref = f"A3:{get_column_letter(max_col)}{max_row}"
 
     widths = {
-        1: 18,
+        1: 22,
         2: 18,
-        3: 18,
-        4: 52,
+        3: 52,
+        4: 9,
     }
     for col_idx in range(1, max_col + 1):
         sheet.column_dimensions[get_column_letter(col_idx)].width = widths.get(col_idx, 16)
     sheet.row_dimensions[2].height = 24
     sheet.row_dimensions[3].height = 42
-
-
-def _write_stores_sheet(workbook: Workbook) -> None:
-    sheet = workbook.create_sheet("Сети")
-    sheet.append(["Канал", "Клиент"])
-    for channel, client in ALL_STORES:
-        sheet.append([channel, client])
-    sheet.freeze_panes = "A2"
-    sheet.column_dimensions["A"].width = 22
-    sheet.column_dimensions["B"].width = 26
-    for cell in sheet[1]:
-        cell.fill = PatternFill("solid", fgColor="D9EAF7")
-        cell.font = Font(bold=True)

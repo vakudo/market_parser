@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS price_observations (
     regular_price_kopecks INTEGER,
     promo_price_kopecks INTEGER,
     loyalty_price_kopecks INTEGER,
+    rating REAL,
     currency TEXT NOT NULL DEFAULT 'RUB',
     availability TEXT NOT NULL,
     status TEXT NOT NULL,
@@ -86,6 +87,15 @@ class Storage:
     def init_db(self) -> None:
         with self.connect() as conn:
             conn.executescript(SCHEMA)
+            self._migrate(conn)
+
+    def _migrate(self, conn: sqlite3.Connection) -> None:
+        columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(price_observations)").fetchall()
+        }
+        if "rating" not in columns:
+            conn.execute("ALTER TABLE price_observations ADD COLUMN rating REAL")
 
     def start_run(self, store_slugs: list[str]) -> int:
         self.init_db()
@@ -127,15 +137,44 @@ class Storage:
                 ),
             )
 
-    def save_prices(self, products: Iterable[ProductPrice], run_id: int | None = None) -> int:
+    def save_prices(
+        self,
+        products: Iterable[ProductPrice],
+        run_id: int | None = None,
+        *,
+        replace_store_day: bool = False,
+    ) -> int:
         self.init_db()
+        products = list(products)
         saved = 0
         with self.connect() as conn:
+            if replace_store_day:
+                self._delete_store_day_observations(conn, products)
             for product in products:
                 product_db_id = self._upsert_product(conn, product)
                 self._upsert_observation(conn, product_db_id, product, run_id)
                 saved += 1
         return saved
+
+    def _delete_store_day_observations(
+        self,
+        conn: sqlite3.Connection,
+        products: list[ProductPrice],
+    ) -> None:
+        store_dates = {
+            (product.store_slug, product.observed_date.isoformat()) for product in products
+        }
+        for store_slug, observed_date in store_dates:
+            conn.execute(
+                """
+                DELETE FROM price_observations
+                WHERE observed_date = ?
+                  AND product_id IN (
+                    SELECT id FROM products WHERE store_slug = ?
+                  )
+                """,
+                (observed_date, store_slug),
+            )
 
     def _upsert_product(self, conn: sqlite3.Connection, product: ProductPrice) -> int:
         now = product.collected_at.isoformat()
@@ -197,15 +236,16 @@ class Storage:
             INSERT INTO price_observations(
                 product_id, run_id, observed_date, collected_at,
                 regular_price_kopecks, promo_price_kopecks, loyalty_price_kopecks,
-                currency, availability, status, raw_error
+                rating, currency, availability, status, raw_error
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(product_id, observed_date) DO UPDATE SET
                 run_id = excluded.run_id,
                 collected_at = excluded.collected_at,
                 regular_price_kopecks = excluded.regular_price_kopecks,
                 promo_price_kopecks = excluded.promo_price_kopecks,
                 loyalty_price_kopecks = excluded.loyalty_price_kopecks,
+                rating = excluded.rating,
                 currency = excluded.currency,
                 availability = excluded.availability,
                 status = excluded.status,
@@ -219,6 +259,7 @@ class Storage:
                 product.regular_price_kopecks,
                 product.promo_price_kopecks,
                 product.loyalty_price_kopecks,
+                product.rating,
                 product.currency,
                 product.availability,
                 product.status,
@@ -248,7 +289,7 @@ class Storage:
                 SELECT
                     p.store_slug, p.store_name, p.category, p.brand, p.name, p.url,
                     o.observed_date, o.regular_price_kopecks, o.promo_price_kopecks,
-                    o.loyalty_price_kopecks, o.currency, o.availability, o.status
+                    o.loyalty_price_kopecks, o.rating, o.currency, o.availability, o.status
                 FROM products p
                 JOIN price_observations o ON o.product_id = p.id
                 WHERE o.observed_date BETWEEN ? AND ?
