@@ -650,10 +650,17 @@ async def _render_on_page(
     scroll_steps: int = 3,
 ) -> str:
     """Navigate an already-open (warmed-up) page and return its HTML, retrying
-    once if an antibot interstitial is shown."""
+    if an antibot interstitial is shown or the navigation is aborted."""
     last_html = ""
-    for _ in range(2):
-        await page.goto(url, wait_until="domcontentloaded", timeout=60_000)
+    for _ in range(3):
+        try:
+            await page.goto(url, wait_until="domcontentloaded", timeout=60_000)
+        except Exception:
+            # Transient navigation abort (e.g. NS_BINDING_ABORTED when an antibot
+            # cancels the request and redirects). Wait and retry instead of
+            # letting it crash the whole store.
+            await page.wait_for_timeout(3_000)
+            continue
         await page.wait_for_timeout(wait_ms)
         for _ in range(scroll_steps):
             await page.mouse.wheel(0, 3000)

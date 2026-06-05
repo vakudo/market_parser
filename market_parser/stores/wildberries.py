@@ -180,7 +180,8 @@ class WildberriesAdapter(BaseStoreAdapter):
                         f"{f', brand {brand_id}' if brand_id else ''}"
                     )
                 break
-            await self.polite_page_delay()
+            # No extra delay here: _get_json already paces every call by
+            # request_spacing_seconds, and 429s are handled by backoff above.
 
     def _append_new_products(
         self,
@@ -225,7 +226,7 @@ class WildberriesAdapter(BaseStoreAdapter):
     ) -> list[str]:
         brand_ids = _brand_ids_from_payload(first_payload)
         for page in range(2, self.max_pages_per_query + 1):
-            await self.polite_page_delay()
+            # _get_json already paces by request_spacing_seconds; no extra delay.
             payload = await self._fetch_page(page, subject_id=subject_id)
             page_products = _products_from_payload(payload)
             if not page_products:

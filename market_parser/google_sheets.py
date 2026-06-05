@@ -9,6 +9,12 @@ from .models import PriceMatrix
 
 SHEETS_SCOPE = ["https://www.googleapis.com/auth/spreadsheets"]
 
+# Writing the full matrix is a large payload the server can take a while to
+# accept, so give the socket plenty of time and retry transient failures
+# (read timeouts, 5xx) instead of crashing the run.
+_HTTP_TIMEOUT_SECONDS = 300
+_NUM_RETRIES = 5
+
 
 @dataclass(frozen=True)
 class GoogleSheetConfig:
@@ -32,7 +38,9 @@ class GoogleSheetsExporter:
 
     def _build_service(self):
         try:
+            import httplib2
             from google.oauth2.service_account import Credentials
+            from google_auth_httplib2 import AuthorizedHttp
             from googleapiclient.discovery import build
         except ImportError as exc:
             raise RuntimeError(
@@ -49,13 +57,16 @@ class GoogleSheetsExporter:
             )
         else:
             raise ValueError("Service account credentials are required")
-        return build("sheets", "v4", credentials=credentials, cache_discovery=False)
+        authed_http = AuthorizedHttp(
+            credentials, http=httplib2.Http(timeout=_HTTP_TIMEOUT_SECONDS)
+        )
+        return build("sheets", "v4", http=authed_http, cache_discovery=False)
 
     def _ensure_sheet(self) -> int:
         spreadsheet = (
             self.service.spreadsheets()
             .get(spreadsheetId=self.config.spreadsheet_id)
-            .execute()
+            .execute(num_retries=_NUM_RETRIES)
         )
         for sheet in spreadsheet.get("sheets", []):
             props = sheet["properties"]
@@ -82,7 +93,7 @@ class GoogleSheetsExporter:
                     ]
                 },
             )
-            .execute()
+            .execute(num_retries=_NUM_RETRIES)
         )
         return int(response["replies"][0]["addSheet"]["properties"]["sheetId"])
 
@@ -91,7 +102,7 @@ class GoogleSheetsExporter:
             spreadsheetId=self.config.spreadsheet_id,
             range=f"'{self.config.sheet_name}'",
             body={},
-        ).execute()
+        ).execute(num_retries=_NUM_RETRIES)
 
     def _write_values(self, values: list[list[Any]]) -> None:
         self.service.spreadsheets().values().batchUpdate(
@@ -105,7 +116,7 @@ class GoogleSheetsExporter:
                     }
                 ],
             },
-        ).execute()
+        ).execute(num_retries=_NUM_RETRIES)
 
     def _apply_formatting(self, sheet_id: int, matrix: PriceMatrix) -> None:
         width = len(BASE_HEADERS) + len(matrix.dates) * len(PRICE_HEADERS)
@@ -195,4 +206,4 @@ class GoogleSheetsExporter:
         self.service.spreadsheets().batchUpdate(
             spreadsheetId=self.config.spreadsheet_id,
             body={"requests": requests},
-        ).execute()
+        ).execute(num_retries=_NUM_RETRIES)

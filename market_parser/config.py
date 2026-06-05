@@ -21,7 +21,13 @@ class Settings(BaseSettings):
     request_timeout_seconds: float = 30.0
     page_delay_seconds: float = 2.0
     page_delay_jitter_seconds: float = 0.75
-    store_delay_seconds: float = 15.0
+    store_delay_seconds: float = 5.0
+    # Stores run concurrently (different domains, so this does not raise the
+    # per-site request rate). Each store still paces its own requests internally.
+    store_concurrency: int = 4
+    # Hard per-store cap so a single stuck store cannot block the whole run and
+    # its final XLSX/Google export. Generous on purpose: only kills true hangs.
+    store_timeout_seconds: float = 2400.0
     browser_headless: bool = True
     browser_proxy_server: str | None = None
     browser_proxy_username: str | None = None

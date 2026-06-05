@@ -110,3 +110,7 @@ def _parse_stores(raw: str | None) -> list[str] | None:
     if unknown:
         raise SystemExit(f"Unknown stores: {', '.join(unknown)}")
     return stores
+
+
+if __name__ == "__main__":
+    main()

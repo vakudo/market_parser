@@ -27,51 +27,60 @@ async def collect_prices(
     selected = list(store_slugs or DEFAULT_STORES)
     storage = Storage(settings.db_path)
     run_id = None if dry_run else storage.start_run(selected)
-    results: list[StoreRunResult] = []
-    all_products: list[ProductPrice] = []
-    errors: list[dict] = []
-    last_network_store_seen = False
+    semaphore = asyncio.Semaphore(max(1, settings.store_concurrency))
 
-    for index, slug in enumerate(selected):
-        adapter = create_adapter(slug, settings)
-        if index and last_network_store_seen and adapter.requires_network:
-            await asyncio.sleep(settings.store_delay_seconds)
-        started = time.perf_counter()
-        try:
-            products = await adapter.fetch_category(limit=limit)
-            duration_seconds = time.perf_counter() - started
-            if adapter.requires_network and not products:
-                raise RuntimeError(f"{adapter.metadata.name}: no products parsed")
-            collected_at = local_now(settings)
-            products = [replace(product, collected_at=collected_at) for product in products]
-            all_products.extend(products)
-            if not dry_run and run_id is not None:
-                storage.save_prices(products, run_id=run_id, replace_store_day=True)
-            results.append(
-                StoreRunResult(
-                    store_slug=slug,
-                    store_name=adapter.metadata.name,
-                    count=len(products),
-                    status="ok",
-                    duration_seconds=duration_seconds,
+    async def run_one(slug: str) -> tuple[StoreRunResult, list[ProductPrice], dict | None]:
+        async with semaphore:
+            adapter = create_adapter(slug, settings)
+            started = time.perf_counter()
+            try:
+                products = await asyncio.wait_for(
+                    adapter.fetch_category(limit=limit),
+                    timeout=settings.store_timeout_seconds,
                 )
-            )
-        except Exception as exc:  # noqa: BLE001 - one store must not fail the whole run.
-            duration_seconds = time.perf_counter() - started
-            message = str(exc) or repr(exc)
-            errors.append({"store": slug, "error": message, "duration_seconds": duration_seconds})
-            results.append(
-                StoreRunResult(
-                    store_slug=slug,
-                    store_name=adapter.metadata.name,
-                    count=0,
-                    status="error",
-                    error=message,
-                    duration_seconds=duration_seconds,
+                duration_seconds = time.perf_counter() - started
+                if adapter.requires_network and not products:
+                    raise RuntimeError(f"{adapter.metadata.name}: no products parsed")
+                collected_at = local_now(settings)
+                products = [replace(product, collected_at=collected_at) for product in products]
+                # Persist each store as soon as it finishes so a later failure
+                # cannot lose an already-collected store.
+                if not dry_run and run_id is not None:
+                    storage.save_prices(products, run_id=run_id, replace_store_day=True)
+                return (
+                    StoreRunResult(
+                        store_slug=slug,
+                        store_name=adapter.metadata.name,
+                        count=len(products),
+                        status="ok",
+                        duration_seconds=duration_seconds,
+                    ),
+                    products,
+                    None,
                 )
-            )
-        if adapter.requires_network:
-            last_network_store_seen = True
+            except Exception as exc:  # noqa: BLE001 - one store must not fail the whole run.
+                duration_seconds = time.perf_counter() - started
+                if isinstance(exc, (asyncio.TimeoutError, TimeoutError)):
+                    message = f"timeout after {settings.store_timeout_seconds:.0f}s"
+                else:
+                    message = str(exc) or repr(exc)
+                return (
+                    StoreRunResult(
+                        store_slug=slug,
+                        store_name=adapter.metadata.name,
+                        count=0,
+                        status="error",
+                        error=message,
+                        duration_seconds=duration_seconds,
+                    ),
+                    [],
+                    {"store": slug, "error": message, "duration_seconds": duration_seconds},
+                )
+
+    gathered = await asyncio.gather(*(run_one(slug) for slug in selected))
+    results = [item[0] for item in gathered]
+    all_products = [product for item in gathered for product in item[1]]
+    errors = [item[2] for item in gathered if item[2] is not None]
 
     if not dry_run and run_id is not None:
         status = "ok" if not errors else "partial"
@@ -129,12 +138,21 @@ async def run_and_export(
     )
     xlsx_path = None
     google_status = None
+    # Collection is already persisted to the DB at this point, so a failure in
+    # either export step must not crash the run or lose the collected data.
     if not dry_run and export_xlsx:
-        xlsx_path = export_current_month(settings)
+        try:
+            xlsx_path = export_current_month(settings)
+        except Exception as exc:  # noqa: BLE001
+            xlsx_path = None
+            print(f"XLSX export failed: {exc}")
     if not dry_run and sync_google:
         if settings.google_configured:
-            sync_google_last_days(settings, days=30)
-            google_status = "synced"
+            try:
+                sync_google_last_days(settings, days=30)
+                google_status = "synced"
+            except Exception as exc:  # noqa: BLE001
+                google_status = f"failed: {exc}"
         else:
             google_status = "skipped: Google Sheets is not configured"
     return results, xlsx_path, google_status
