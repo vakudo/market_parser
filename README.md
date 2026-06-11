@@ -106,11 +106,16 @@ crontab -e
 
 1. Создай бота через [@BotFather](https://t.me/BotFather) (`/newbot`) — получишь токен.
 2. Пропиши в `.env`: `TELEGRAM_BOT_TOKEN=<токен>`.
-3. Напиши своему боту любое сообщение (например `/start`), затем узнай свой chat id:
+3. **Обязательно** напиши своему боту любое сообщение (например `/start`) — бот не может
+   писать первым. Затем узнай свой chat id любым из способов:
    ```bash
    python -m market_parser.cli telegram-chat-id
    ```
-4. Пропиши `TELEGRAM_CHAT_ID=<id>` в `.env`.
+   или открой в браузере `https://api.telegram.org/bot<токен>/getUpdates` (слово `bot` и
+   токен — слитно) и найди в ответе `"chat":{"id":...}`. Апдейты хранятся 24 часа: если
+   ответ пустой — напиши боту ещё раз и обнови страницу.
+4. Пропиши `TELEGRAM_CHAT_ID=<id>` в `.env`. Проверка: `python -m market_parser.cli send-telegram`
+   — в чат придёт XLSX за текущий месяц.
 
 ### Команды
 
@@ -129,8 +134,10 @@ python -m market_parser.cli send-telegram --month 2026-05 --message "Архив 
 
 1. Запушь репозиторий на GitHub.
 2. На [railway.app](https://railway.app): **New Project → Deploy from GitHub repo**.
-3. В сервисе добавь **Volume** с mount path `/app/data` — там живёт SQLite с историей цен
-   (без него каждый прогон будет «с нуля», и в файле будет только одна дата).
+3. В сервисе добавь **Volume** (правый клик по сервису → Attach Volume) с mount path
+   `/app/data` — там живёт SQLite с историей цен (без него каждый прогон будет «с нуля»,
+   и в файле будет только одна дата). В сам `Dockerfile` инструкцию `VOLUME` добавлять
+   нельзя — билдер Railway её не поддерживает и роняет сборку.
 4. В **Variables** задай:
    - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`;
    - `MARKET_PARSER_BROWSER_PROXY_SERVER` (+ `..._USERNAME` / `..._PASSWORD`) —
@@ -138,8 +145,9 @@ python -m market_parser.cli send-telegram --month 2026-05 --message "Архив 
    - для Google Sheets (опционально): `GOOGLE_SHEET_ID` и `GOOGLE_SERVICE_ACCOUNT_JSON`
      (вставь содержимое `google-sa.json` одной строкой — файла на Railway нет).
 5. Проверь, что в **Settings → Cron Schedule** подтянулось `0 6 * * *` из `railway.json`
-   (расписание указывается в **UTC**). Для разовой проверки нажми **Deploy/Run** вручную —
-   в Telegram должна прийти сводка и файл.
+   (расписание указывается в **UTC**). Для разовой проверки нажми **Redeploy** —
+   для cron-сервиса это разовый запуск прогона; в Telegram должна прийти сводка и файл
+   (полный прогон занимает десятки минут).
 
 > Контейнер должен завершаться после прогона — это штатное поведение cron-сервиса Railway,
 > «Restart Policy: Never» уже задан в `railway.json`.
