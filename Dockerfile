@@ -1,4 +1,6 @@
-FROM mcr.microsoft.com/playwright/python:v1.56.0-noble
+# Версия образа должна совпадать с пином playwright в pyproject.toml (<1.50,
+# иначе драйвер несовместим с camoufox 0.4.x и браузеры падают на старте).
+FROM mcr.microsoft.com/playwright/python:v1.48.0-noble
 
 WORKDIR /app
 
