@@ -14,7 +14,8 @@ ENV MARKET_PARSER_DB_PATH=/app/data/market_parser.sqlite \
     MARKET_PARSER_EXPORT_DIR=/app/exports \
     MARKET_PARSER_TIMEZONE=Europe/Moscow
 
-VOLUME ["/app/data", "/app/exports"]
+# Том для /app/data (история цен) подключается снаружи: Railway Volume или `docker -v`.
+# Инструкцию VOLUME не используем — билдер Railway её не поддерживает.
 
 ENTRYPOINT ["market-parser"]
 # Дневной cron-прогон: собрать 16 авто-магазинов, выгрузить XLSX/Google и
