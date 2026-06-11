@@ -125,6 +125,12 @@ python -m market_parser.cli send-telegram           # отправить XLSX т
 python -m market_parser.cli send-telegram --month 2026-05 --message "Архив за май"
 ```
 
+> Если локально команды падают с `ConnectError [WinError 10054]` — провайдер режет
+> api.telegram.org по TLS-отпечатку Python (PowerShell/браузер при этом работают).
+> На Railway это не воспроизводится. Локальный обход — запустить VPN-клиент с локальным
+> прокси и задать `HTTPS_PROXY=http://127.0.0.1:<port>` перед командой, либо слать через
+> `curl.exe -F document=@exports/<месяц>.xlsx ...sendDocument`.
+
 ## Деплой на Railway (авто-отправка каждое утро)
 
 Репозиторий уже содержит всё нужное: `Dockerfile` (команда по умолчанию —
