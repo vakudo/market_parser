@@ -28,6 +28,9 @@ async def collect_prices(
     storage = Storage(settings.db_path)
     run_id = None if dry_run else storage.start_run(selected)
     semaphore = asyncio.Semaphore(max(1, settings.store_concurrency))
+    # Progress goes to stdout as stores finish: on a cron host (Railway) the run
+    # takes tens of minutes and an empty log looks like a hang.
+    print(f"Collecting {len(selected)} stores: {', '.join(selected)}", flush=True)
 
     async def run_one(slug: str) -> tuple[StoreRunResult, list[ProductPrice], dict | None]:
         async with semaphore:
@@ -47,6 +50,10 @@ async def collect_prices(
                 # cannot lose an already-collected store.
                 if not dry_run and run_id is not None:
                     storage.save_prices(products, run_id=run_id, replace_store_day=True)
+                print(
+                    f"[{slug}] ok: {len(products)} products in {duration_seconds:.0f}s",
+                    flush=True,
+                )
                 return (
                     StoreRunResult(
                         store_slug=slug,
@@ -64,6 +71,7 @@ async def collect_prices(
                     message = f"timeout after {settings.store_timeout_seconds:.0f}s"
                 else:
                     message = str(exc) or repr(exc)
+                print(f"[{slug}] error after {duration_seconds:.0f}s: {message}", flush=True)
                 return (
                     StoreRunResult(
                         store_slug=slug,

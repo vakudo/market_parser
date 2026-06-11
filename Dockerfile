@@ -10,7 +10,9 @@ RUN pip install --no-cache-dir .
 # Антибот-браузер Camoufox (для ozon, wildberries, lenta и др.) — качаем на этапе сборки.
 RUN python -m camoufox fetch
 
-ENV MARKET_PARSER_DB_PATH=/app/data/market_parser.sqlite \
+# PYTHONUNBUFFERED — чтобы прогресс прогона появлялся в логах Railway сразу, а не в конце.
+ENV PYTHONUNBUFFERED=1 \
+    MARKET_PARSER_DB_PATH=/app/data/market_parser.sqlite \
     MARKET_PARSER_EXPORT_DIR=/app/exports \
     MARKET_PARSER_TIMEZONE=Europe/Moscow
 
