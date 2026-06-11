@@ -10,6 +10,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
   "beautifulsoup4>=4.12.0",
+  "camoufox>=0.4.11",
   "google-api-python-client>=2.130.0",
   "google-auth>=2.30.0",
   "httpx>=0.27.0",

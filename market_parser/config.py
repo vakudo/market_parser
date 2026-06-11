@@ -50,6 +50,19 @@ class Settings(BaseSettings):
         validation_alias="GOOGLE_SERVICE_ACCOUNT_JSON",
     )
 
+    telegram_bot_token: str | None = Field(
+        default=None,
+        validation_alias="TELEGRAM_BOT_TOKEN",
+    )
+    telegram_chat_id: str | None = Field(
+        default=None,
+        validation_alias="TELEGRAM_CHAT_ID",
+    )
+
+    @property
+    def telegram_configured(self) -> bool:
+        return bool(self.telegram_bot_token and self.telegram_chat_id)
+
     @property
     def google_configured(self) -> bool:
         return bool(

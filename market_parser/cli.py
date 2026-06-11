@@ -9,12 +9,14 @@ from .exporter import export_monthly_xlsx, last_n_days_range
 from .runner import (
     auto_store_slugs,
     available_store_slugs,
+    local_now,
     run_and_export,
     run_async,
     sync_google_last_days,
 )
 from .storage import Storage
 from .stores import list_stores
+from .telegram import list_chat_ids, send_document, send_message, send_run_report
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -35,6 +37,11 @@ def main(argv: list[str] | None = None) -> None:
     run_parser.add_argument("--dry-run", action="store_true", help="Do not write DB/XLSX/Google")
     run_parser.add_argument("--no-xlsx", action="store_true", help="Skip XLSX export")
     run_parser.add_argument("--no-google", action="store_true", help="Skip Google Sheets sync")
+    run_parser.add_argument(
+        "--telegram",
+        action="store_true",
+        help="Send the run summary and XLSX file to Telegram after the run",
+    )
 
     export_parser = subparsers.add_parser("export-xlsx", help="Export one monthly XLSX")
     export_parser.add_argument("--month", default=date.today().strftime("%Y-%m"), help="YYYY-MM")
@@ -44,6 +51,17 @@ def main(argv: list[str] | None = None) -> None:
 
     runs_parser = subparsers.add_parser("runs", help="Show recent run summaries")
     runs_parser.add_argument("--limit", type=int, default=10)
+
+    send_parser = subparsers.add_parser(
+        "send-telegram", help="Send the monthly XLSX (without collecting) to Telegram"
+    )
+    send_parser.add_argument("--month", default=date.today().strftime("%Y-%m"), help="YYYY-MM")
+    send_parser.add_argument("--message", help="Optional text message to send before the file")
+
+    subparsers.add_parser(
+        "telegram-chat-id",
+        help="Print chat ids seen by the bot (send the bot a message first)",
+    )
 
     args = parser.parse_args(argv)
     settings = Settings()
@@ -83,6 +101,10 @@ def main(argv: list[str] | None = None) -> None:
             print(f"XLSX: {xlsx_path}")
         if google_status:
             print(f"Google Sheets: {google_status}")
+        if args.telegram and not args.dry_run:
+            run_date = local_now(settings).strftime("%d.%m.%Y")
+            send_run_report(settings, results, xlsx_path, google_status, run_date)
+            print("Telegram: sent")
         return
 
     if args.command == "export-xlsx":
@@ -99,6 +121,23 @@ def main(argv: list[str] | None = None) -> None:
     if args.command == "runs":
         rows = Storage(settings.db_path).fetch_latest_runs(limit=args.limit)
         print(json.dumps(rows, ensure_ascii=False, indent=2))
+        return
+
+    if args.command == "send-telegram":
+        path = export_monthly_xlsx(Storage(settings.db_path), settings.export_dir, args.month)
+        if args.message:
+            send_message(settings, args.message)
+        send_document(settings, path, caption=f"Выгрузка цен за {args.month}")
+        print(f"Telegram: sent {path}")
+        return
+
+    if args.command == "telegram-chat-id":
+        chats = list_chat_ids(settings)
+        if not chats:
+            print("Чатов не найдено. Напиши боту любое сообщение и повтори команду.")
+            return
+        for chat in chats:
+            print(f"{chat['id']}\t{chat['type']}\t{chat['title']}")
         return
 
 

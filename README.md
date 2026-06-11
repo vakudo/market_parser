@@ -97,6 +97,53 @@ crontab -e
 
 > Если нужно по московскому времени на UTC-сервере — поставь `0 6 * * *` или задай `TZ=Europe/Moscow` в crontab.
 
+## Telegram-бот: файл каждое утро
+
+После дневного прогона бот присылает в чат сводку (какие магазины собрались, сколько
+товаров) и сам XLSX-файл за текущий месяц.
+
+### Настройка бота
+
+1. Создай бота через [@BotFather](https://t.me/BotFather) (`/newbot`) — получишь токен.
+2. Пропиши в `.env`: `TELEGRAM_BOT_TOKEN=<токен>`.
+3. Напиши своему боту любое сообщение (например `/start`), затем узнай свой chat id:
+   ```bash
+   python -m market_parser.cli telegram-chat-id
+   ```
+4. Пропиши `TELEGRAM_CHAT_ID=<id>` в `.env`.
+
+### Команды
+
+```bash
+python -m market_parser.cli run --auto --telegram   # дневной прогон + отправка в TG
+python -m market_parser.cli send-telegram           # отправить XLSX текущего месяца без сбора
+python -m market_parser.cli send-telegram --month 2026-05 --message "Архив за май"
+```
+
+## Деплой на Railway (авто-отправка каждое утро)
+
+Репозиторий уже содержит всё нужное: `Dockerfile` (команда по умолчанию —
+`run --auto --telegram`) и `railway.json` с cron-расписанием `0 6 * * *`
+(06:00 UTC = 09:00 МСК). Railway запускает контейнер по расписанию, тот собирает цены,
+шлёт файл в Telegram и завершается.
+
+1. Запушь репозиторий на GitHub.
+2. На [railway.app](https://railway.app): **New Project → Deploy from GitHub repo**.
+3. В сервисе добавь **Volume** с mount path `/app/data` — там живёт SQLite с историей цен
+   (без него каждый прогон будет «с нуля», и в файле будет только одна дата).
+4. В **Variables** задай:
+   - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`;
+   - `MARKET_PARSER_BROWSER_PROXY_SERVER` (+ `..._USERNAME` / `..._PASSWORD`) —
+     **резидентный российский прокси, без него почти все магазины вернут 0** (см. раздел про IP ниже);
+   - для Google Sheets (опционально): `GOOGLE_SHEET_ID` и `GOOGLE_SERVICE_ACCOUNT_JSON`
+     (вставь содержимое `google-sa.json` одной строкой — файла на Railway нет).
+5. Проверь, что в **Settings → Cron Schedule** подтянулось `0 6 * * *` из `railway.json`
+   (расписание указывается в **UTC**). Для разовой проверки нажми **Deploy/Run** вручную —
+   в Telegram должна прийти сводка и файл.
+
+> Контейнер должен завершаться после прогона — это штатное поведение cron-сервиса Railway,
+> «Restart Policy: Never» уже задан в `railway.json`.
+
 ## ⚠️ Важно про IP (иначе антибот-магазины не соберутся)
 
 Магазины с антиботом (Wildberries, Ozon, Детский мир, Магнит, Чижик, Пятёрочка, Лента и др.)
