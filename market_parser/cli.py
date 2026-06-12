@@ -79,7 +79,7 @@ def main(argv: list[str] | None = None) -> None:
     if args.command == "run":
         selected = _parse_stores(args.stores)
         if selected is None and args.auto:
-            selected = auto_store_slugs()
+            selected = auto_store_slugs(settings)
         results, xlsx_path, google_status = run_async(
             run_and_export(
                 settings,

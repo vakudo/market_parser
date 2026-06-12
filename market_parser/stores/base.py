@@ -35,6 +35,9 @@ class BaseStoreAdapter(ABC):
     # False for stores that can only be collected manually (e.g. via the CDP
     # real-browser flow), so the daily automated run skips them.
     auto_runnable: bool = True
+    # True for stores that need a scraping API key (the ServicePipe/Variti
+    # stores). They join the daily run only when one is configured.
+    requires_scrape_api: bool = False
 
     def __init__(self, settings: Settings):
         self.settings = settings

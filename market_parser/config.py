@@ -59,9 +59,23 @@ class Settings(BaseSettings):
         validation_alias="TELEGRAM_CHAT_ID",
     )
 
+    # Scraping API for the ServicePipe/Variti stores (samokat, perekrestok,
+    # onlinetrade). Their JS proof-of-work challenge blocks our own browser even
+    # on a residential IP, so we route those three through a provider that
+    # solves the antibot and gives RU residential exit IPs. Without a key they
+    # stay manual (see run_logs/cdp_*.py).
+    scrape_api_provider: str = "zyte"  # "zyte" (pay-as-you-go), "zenrows", or "scrapfly"
+    scrape_api_key: str | None = None  # env: MARKET_PARSER_SCRAPE_API_KEY
+    scrape_api_country: str = "ru"
+    scrape_api_timeout_seconds: float = 90.0
+
     @property
     def telegram_configured(self) -> bool:
         return bool(self.telegram_bot_token and self.telegram_chat_id)
+
+    @property
+    def scrape_api_configured(self) -> bool:
+        return bool(self.scrape_api_key)
 
     @property
     def google_configured(self) -> bool:
