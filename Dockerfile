@@ -12,22 +12,6 @@ RUN pip install --no-cache-dir .
 # Антибот-браузер Camoufox (для ozon, wildberries, lenta и др.) — качаем на этапе сборки.
 RUN python -m camoufox fetch
 
-# Настоящий Chrome + Xvfb для Variti-магазинов (samokat/perekrestok/onlinetrade):
-# patchright водит системный Chrome headful под виртуальным дисплеем.
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends wget gnupg xvfb \
-    && wget -qO- https://dl.google.com/linux/linux_signing_key.pub \
-       | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg \
-    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" \
-       > /etc/apt/sources.list.d/google-chrome.list \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends google-chrome-stable \
-    && rm -rf /var/lib/apt/lists/*
-
-# Часовой пояс контейнера = московский: согласован с IP резидентного прокси,
-# чтобы Variti не видел рассинхрон таймзоны браузера и адреса.
-ENV TZ=Europe/Moscow
-
 # PYTHONUNBUFFERED — чтобы прогресс прогона появлялся в логах Railway сразу, а не в конце.
 ENV PYTHONUNBUFFERED=1 \
     MARKET_PARSER_DB_PATH=/app/data/market_parser.sqlite \

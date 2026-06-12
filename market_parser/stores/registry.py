@@ -13,14 +13,12 @@ from market_parser.stores.retail_sources import (
     DixyAdapter,
     KrasnoeBeloeAdapter,
     LentaAdapter,
+    OnlinetradeAdapter,
+    PerekrestokAdapter,
     PyaterochkaAdapter,
+    SamokatAdapter,
     VkusvillAdapter,
     YandexLavkaAdapter,
-)
-from market_parser.stores.stealth import (
-    OnlinetradeStealthAdapter,
-    PerekrestokStealthAdapter,
-    SamokatStealthAdapter,
 )
 from market_parser.stores.vprok import VprokAdapter
 from market_parser.stores.wildberries import WildberriesAdapter
@@ -36,11 +34,11 @@ STORE_ADAPTERS: dict[str, type[BaseStoreAdapter]] = {
     "lenta": LentaAdapter,
     "magnit": MagnitAdapter,
     "metro": MetroAdapter,
-    "onlinetrade": OnlinetradeStealthAdapter,
+    "onlinetrade": OnlinetradeAdapter,
     "ozon": OzonAdapter,
-    "perekrestok": PerekrestokStealthAdapter,
+    "perekrestok": PerekrestokAdapter,
     "pyaterochka": PyaterochkaAdapter,
-    "samokat": SamokatStealthAdapter,
+    "samokat": SamokatAdapter,
     "vprok": VprokAdapter,
     "vkusvill": VkusvillAdapter,
     "wildberries": WildberriesAdapter,
