@@ -4,14 +4,18 @@
 
 ## Что собирается
 
-**19 магазинов.** 16 из них собираются автоматически, 3 — только вручную (см. ниже).
+**19 магазинов, все автоматически.**
 
-- **Авто (16):** `wildberries`, `ozon`, `detmir`, `metro`, `auchan`, `magnit`, `dixy`,
+- **Обычные (16):** `wildberries`, `ozon`, `detmir`, `metro`, `auchan`, `magnit`, `dixy`,
   `pyaterochka`, `lenta`, `yandex_market`, `chizhik`, `vkusvill`, `yandex_lavka`,
-  `vprok`, `krasnoe_beloe`, `komus`.
-- **Только вручную (3, через реальный браузер):** `samokat`, `perekrestok`, `onlinetrade`
-  — у них антибот **Variti**, который не пропускает автоматизированный браузер. Собираются
-  скриптами `run_logs/cdp_*.py` через CDP-подключение к твоему Chrome (см. «Антибот-магазины»).
+  `vprok`, `krasnoe_beloe`, `komus` — через httpx/Camoufox.
+- **Variti-магазины (3):** `samokat`, `perekrestok`, `onlinetrade` — у них антибот
+  **Variti**, который не пропускает обычные автоматизированные браузеры. Собираются через
+  **patchright** (настоящий Chrome без следов автоматизации) с постоянным профилем;
+  на сервере Chrome работает headful под Xvfb. Требуют установленный Google Chrome
+  и резидентный российский IP (см. «Важно про IP»). Если Variti всё же показал
+  челлендж и не пропустил за ~25 секунд — магазин помечается ошибкой, остальные
+  не страдают. Старые ручные скрипты `run_logs/cdp_*.py` остаются как запасной путь.
 
 По каждому товару: сеть, бренд, наименование, **ссылка**, **рейтинг** (где есть), и цены
 (регулярная / со скидкой / по карте лояльности) по каждой дате.
@@ -49,8 +53,7 @@ JSON-ключ в корень проекта как `google-sa.json`, и под�
 ## Использование
 
 ```bash
-python -m market_parser.cli run --auto            # дневной прогон: 16 авто-магазинов + XLSX + Google
-python -m market_parser.cli run                    # все магазины (3 CDP-магазина отвалятся)
+python -m market_parser.cli run --auto            # дневной прогон: все 19 магазинов + XLSX + Google
 python -m market_parser.cli run --stores ozon,wildberries --limit 50
 python -m market_parser.cli run --auto --dry-run   # без записи в БД/XLSX/Google
 python -m market_parser.cli export-xlsx --month 2026-06
@@ -149,7 +152,9 @@ python -m market_parser.cli send-telegram --month 2026-05 --message "Архив 
    - `MARKET_PARSER_BROWSER_PROXY_SERVER` (+ `..._USERNAME` / `..._PASSWORD`) —
      **резидентный российский прокси, без него почти все магазины вернут 0** (см. раздел про IP ниже);
    - для Google Sheets (опционально): `GOOGLE_SHEET_ID` и `GOOGLE_SERVICE_ACCOUNT_JSON`
-     (вставь содержимое `google-sa.json` одной строкой — файла на Railway нет).
+     (вставь содержимое `google-sa.json` одной строкой — файла на Railway нет);
+   - `MARKET_PARSER_STORE_CONCURRENCY=2` — рекомендуется: меньше одновременных
+     браузеров, меньше пиковая память (при OOM-остановках контейнера поставь `1`).
 5. Проверь, что в **Settings → Cron Schedule** подтянулось `0 6 * * *` из `railway.json`
    (расписание указывается в **UTC**). Для разовой проверки нажми **Redeploy** —
    для cron-сервиса это разовый запуск прогона; в Telegram должна прийти сводка и файл
@@ -175,8 +180,13 @@ Google Sheets API при этом должен оставаться доступ
 
 ## Антибот-магазины (Samokat / Perekrestok / Onlinetrade)
 
-У них защита Variti, которая ловит автоматизацию даже в Camoufox. Собираются **вручную**
-через твой настоящий Chrome:
+У них защита Variti, которая ловит автоматизацию даже в Camoufox. Теперь они входят в
+авто-прогон: `market_parser/stores/stealth.py` водит **настоящий Chrome** через patchright
+(без следов автоматизации), профиль хранится в `data/browser_states/stealth_<магазин>` —
+куки Variti накапливаются и переживают перезапуски. Нужны: установленный Google Chrome
+(локально уже есть; в Docker ставится при сборке) и российский резидентный IP.
+
+Если Variti всё-таки упёрся в капчу — есть запасной ручной путь через CDP:
 
 1. Полностью закрой Chrome, затем запусти отладочный экземпляр:
    ```powershell
@@ -186,7 +196,7 @@ Google Sheets API при этом должен оставаться доступ
 3. Запусти сборщик: `python run_logs/cdp_collect.py` (Самокат),
    `run_logs/cdp_pk_collect.py` (Перекрёсток), `run_logs/cdp_ot_collect.py` (Онлайнтрейд).
 
-Эти данные дописываются в ту же БД/таблицу. В дневной авто-прогон они не входят.
+Эти данные дописываются в ту же БД/таблицу.
 
 
 

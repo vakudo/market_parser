@@ -15,6 +15,11 @@ dependencies = [
   "google-auth>=2.30.0",
   "httpx>=0.27.0",
   "openpyxl>=3.1.0",
+  # Variti-магазины (samokat/perekrestok/onlinetrade): patchright управляет настоящим
+  # Chrome без следов автоматизации; pyvirtualdisplay даёт ему дисплей на сервере.
+  # Версия в ногу с playwright (<1.49), иначе конфликт по pyee.
+  "patchright>=1.45.0,<1.49",
+  "pyvirtualdisplay>=3.0; platform_system != 'Windows'",
   # <1.49: версия должна совпадать с базовым Docker-образом (v1.48.0), иначе
   # playwright ищет chromium не той сборки. И не выше 1.4x: новые драйверы
   # несовместимы с camoufox 0.4.x (Node-драйвер падает с TypeError reading url).
