@@ -174,23 +174,13 @@ def available_store_slugs() -> list[str]:
     return sorted(STORE_ADAPTERS)
 
 
-def auto_store_slugs(settings: Settings | None = None) -> list[str]:
-    """Stores that can run unattended.
-
-    Excludes manual-only stores. The ServicePipe/Variti stores
-    (``requires_scrape_api``) are included only when a scrape API key is
-    configured; otherwise they stay manual via ``run_logs/cdp_*.py``.
-    """
-    has_scrape_api = bool(settings and settings.scrape_api_configured)
-    slugs = []
-    for slug in sorted(STORE_ADAPTERS):
-        adapter_cls = STORE_ADAPTERS[slug]
-        if not getattr(adapter_cls, "auto_runnable", True):
-            continue
-        if getattr(adapter_cls, "requires_scrape_api", False) and not has_scrape_api:
-            continue
-        slugs.append(slug)
-    return slugs
+def auto_store_slugs() -> list[str]:
+    """Stores that can run unattended (excludes CDP/manual-only ones)."""
+    return [
+        slug
+        for slug in sorted(STORE_ADAPTERS)
+        if getattr(STORE_ADAPTERS[slug], "auto_runnable", True)
+    ]
 
 
 def local_now(settings: Settings):

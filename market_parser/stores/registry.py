@@ -13,14 +13,12 @@ from market_parser.stores.retail_sources import (
     DixyAdapter,
     KrasnoeBeloeAdapter,
     LentaAdapter,
-    PyaterochkaAdapter,
-    VkusvillAdapter,
-    YandexLavkaAdapter,
-)
-from market_parser.stores.variti import (
     OnlinetradeAdapter,
     PerekrestokAdapter,
+    PyaterochkaAdapter,
     SamokatAdapter,
+    VkusvillAdapter,
+    YandexLavkaAdapter,
 )
 from market_parser.stores.vprok import VprokAdapter
 from market_parser.stores.wildberries import WildberriesAdapter

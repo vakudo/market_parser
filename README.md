@@ -4,19 +4,16 @@
 
 ## Что собирается
 
-**19 магазинов.** 16 собираются всегда; ещё 3 (за антиботом Variti) идут в авто-прогон,
-если задан ключ scraping-API, иначе остаются ручными (см. ниже).
+**19 магазинов.** 16 из них собираются автоматически, 3 — только вручную (см. ниже).
 
 - **Авто (16):** `wildberries`, `ozon`, `detmir`, `metro`, `auchan`, `magnit`, `dixy`,
   `pyaterochka`, `lenta`, `yandex_market`, `chizhik`, `vkusvill`, `yandex_lavka`,
   `vprok`, `krasnoe_beloe`, `komus`.
-- **За антиботом Variti (3):** `samokat`, `perekrestok`, `onlinetrade` — у них защита
-  **ServicePipe (Variti)** с JS-челленджем, который блокирует наш браузер даже на домашнем
-  IP (проверено и локально, и на Railway: stealth-Chrome через patchright не проходит).
-  Поэтому они собираются через **сторонний scraping-API** (ZenRows/Scrapfly), который сам
-  проходит антибот и даёт российский резидентный IP. Задай `MARKET_PARSER_SCRAPE_API_KEY` —
-  и эти три войдут в `run --auto`. Без ключа остаётся ручной путь через CDP
-  (`run_logs/cdp_*.py`, см. «Антибот-магазины»).
+- **На домашней машине (3):** `samokat`, `perekrestok`, `onlinetrade` — у них антибот
+  **ServicePipe (Variti)** с капчей, которую не проходит ни наш браузер, ни платный
+  scraping-API с серверного IP. Собираются реальным Chrome с домашнего IP по расписанию
+  (`scripts\collect_variti_local.ps1`) в отдельную вкладку Google-листа — см.
+  «Антибот-магазины».
 
 По каждому товару: сеть, бренд, наименование, **ссылка**, **рейтинг** (где есть), и цены
 (регулярная / со скидкой / по карте лояльности) по каждой дате.
@@ -152,10 +149,6 @@ python -m market_parser.cli send-telegram --month 2026-05 --message "Архив 
    - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`;
    - `MARKET_PARSER_BROWSER_PROXY_SERVER` (+ `..._USERNAME` / `..._PASSWORD`) —
      **резидентный российский прокси, без него почти все магазины вернут 0** (см. раздел про IP ниже);
-   - `MARKET_PARSER_SCRAPE_API_KEY` — ключ scraping-API (по умолчанию провайдер `zyte`,
-     pay-as-you-go; `MARKET_PARSER_SCRAPE_API_PROVIDER=zenrows|scrapfly` чтобы сменить).
-     **Без него samokat / perekrestok / onlinetrade не соберутся** — у них антибот Variti,
-     обычный браузер он блокирует и на Railway тоже (см. «Антибот-магазины»);
    - для Google Sheets (опционально): `GOOGLE_SHEET_ID` и `GOOGLE_SERVICE_ACCOUNT_JSON`
      (вставь содержимое `google-sa.json` одной строкой — файла на Railway нет);
    - `MARKET_PARSER_STORE_CONCURRENCY=2` — рекомендуется: меньше одновременных
@@ -185,37 +178,39 @@ Google Sheets API при этом должен оставаться доступ
 
 ## Антибот-магазины (Samokat / Perekrestok / Onlinetrade)
 
-У них защита **ServicePipe (Variti)** с криптографическим JS-челленджем (`fp.min.js` +
-`jsrsasign`): обычный HTTP отдаёт заглушку ~1.7 КБ, а автоматизированный браузер она
-детектирует и блокирует **даже на домашнем резидентном IP** — это подтвердил откат
-эксперимента со stealth-Chrome (patchright) на Railway.
+У них защита **ServicePipe (Variti)** с криптографическим JS-челленджем, который
+эскалирует до **капчи с вращением картинки** (`sp_rotated_captcha`). Её не проходит ни
+наш браузер (Camoufox/patchright), ни платный scraping-API (проверено: Zyte честно
+рендерит страницу, но упирается в ту же капчу и возвращает её вместо товаров) — с любого
+**серверного/датацентрового IP**. Надёжно пробивается только **реальным Chrome с домашнего
+резидентного IP**, где ServicePipe капчу обычно не показывает. Поэтому эти три магазина
+собираются **на домашней машине**, а не на Railway.
 
-**Авто-сбор (рекомендуется):** запросы к этим трём магазинам идут через сторонний
-scraping-API — `market_parser/stores/variti.py` тянет отрендеренный HTML функцией
-`fetch_via_scrape_api` (`stores/scrape_api.py`), а бэкенд провайдера сам проходит антибот и
-даёт RU-резидентный IP. Задай `MARKET_PARSER_SCRAPE_API_KEY`, и магазины войдут в
-`run --auto`. Провайдер выбирается `MARKET_PARSER_SCRAPE_API_PROVIDER`:
+### Автоматический домашний сбор (по расписанию)
 
-- `zyte` (по умолчанию) — **pay-as-you-go, без месячного минимума, платишь только за
-  успешные запросы** (на этом объёме ~$3–10/мес). Ключ — твой Zyte API key.
-  ⚠️ У Zyte нет потолка трат по умолчанию — выставь spending limit в их панели.
-- `zenrows` / `scrapfly` — подписочные планы (от ~$70/мес), но есть бесплатные триалы.
+```powershell
+# 1. Один раз вручную — задать адрес Самоката и решить капчу, если появится:
+powershell -ExecutionPolicy Bypass -File scripts\collect_variti_local.ps1
+# 2. Поставить в планировщик (каждый день в 08:45, пока ты залогинен):
+powershell -ExecutionPolicy Bypass -File scripts\install_variti_schedule.ps1
+```
 
-Парсинг карточек повторяет логику CDP-скриптов. Самокат/Перекрёсток — виртуализированные
-списки, поэтому забор идёт со скроллом и может быть частичным; Онлайнтрейд листается
-постранично и собирается полностью.
+`collect_variti_local.ps1` сам запускает отладочный Chrome с постоянным профилем
+(`data\chrome_variti_profile`), открывает 3 категории (`run_logs/open_variti_tabs.py`),
+прогоняет CDP-сборщики и синкает результат в **отдельную вкладку** Google-листа
+(`Variti_30д`) из **отдельной БД** `data\variti.sqlite` — чтобы не затирать 16 магазинов,
+которые пишет Railway в основную вкладку. Логи — в `logs\variti_*.log`.
 
-**Ручной путь через CDP (без ключа, либо если провайдер не пробил антибот):**
+> Самокат — SPA с геолокацией: на первом запуске задай адрес доставки в открывшемся окне
+> Chrome (профиль это запомнит). URL категории Самоката можно переопределить переменной
+> `MARKET_PARSER_SAMOKAT_URL`.
 
-1. Полностью закрой Chrome, затем запусти отладочный экземпляр:
-   ```powershell
-   & "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="$env:TEMP\chrome-debug"
-   ```
-2. Открой нужный магазин, при капче — реши её руками, дождись товаров.
-3. Запусти сборщик: `python run_logs/cdp_collect.py` (Самокат),
+### Ручной путь (если капча всё же выскочила)
+
+1. Запусти `scripts\collect_variti_local.ps1` — он откроет Chrome с нужными вкладками.
+2. Реши капчу в окне руками, дождись товаров, и скрипт продолжит сам. Либо запусти
+   сборщики отдельно: `python run_logs/cdp_collect.py` (Самокат),
    `run_logs/cdp_pk_collect.py` (Перекрёсток), `run_logs/cdp_ot_collect.py` (Онлайнтрейд).
-
-Эти данные дописываются в ту же БД/таблицу.
 
 
 

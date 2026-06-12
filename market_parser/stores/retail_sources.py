@@ -1197,9 +1197,53 @@ class VkusvillAdapter(RetailSourceAdapter):
     warmup_url = "https://vkusvill.ru/"
 
 
-# NOTE: samokat / perekrestok / onlinetrade live in stores/variti.py — they sit
-# behind ServicePipe (Variti) and are fetched through a scraping API instead of
-# our own browser. They used to be defined here as manual-only adapters.
+class OnlinetradeAdapter(RetailSourceAdapter):
+    auto_runnable = False  # collected manually via run_logs/cdp_ot_collect.py
+    metadata = StoreMetadata(
+        slug="onlinetrade",
+        name="Онлайнтрейд.ру",
+        channel="Е-ком",
+        category_url="https://www.onlinetrade.ru/catalogue/detskoe_pyure-c1210/",
+    )
+    source_urls = (
+        "https://www.onlinetrade.ru/catalogue/detskoe_pyure-c1210/",
+        "https://www.onlinetrade.ru/catalogue/detskoe_pyure-c1210/frutonyanya/",
+    )
+    browser_fallback = False
+    reader_fallback = False
+    product_href_patterns = (r"/catalogue/.+-p\d+/", r"/catalogue/")
+
+
+class SamokatAdapter(RetailSourceAdapter):
+    auto_runnable = False  # collected manually via run_logs/cdp_collect.py
+    metadata = StoreMetadata(
+        slug="samokat",
+        name="Самокат",
+        channel="Е-ком",
+        category_url="https://samokat.ru/",
+    )
+    source_urls = ("https://samokat.ru/",)
+    browser_fallback = False
+    reader_fallback = False
+    product_href_patterns = (r"/product", r"/category")
+
+
+class PerekrestokAdapter(RetailSourceAdapter):
+    auto_runnable = False  # collected manually via run_logs/cdp_pk_collect.py
+    metadata = StoreMetadata(
+        slug="perekrestok",
+        name="Перекрёсток",
+        channel="Федеральная сеть",
+        category_url="https://www.perekrestok.ru/cat/230/detskoe-pitanie",
+    )
+    source_urls = (
+        "https://www.perekrestok.ru/cat/230/detskoe-pitanie",
+        "https://promo.perekrestok.ru/cat/230/p/pure-fruktovoe-agusa-grusa-s-4-mesacev-115g-3001752",
+        "https://promo.perekrestok.ru/cat/230/p/sok-detskij-agusa-abloko-mango-banan-s-makotu-500ml-4196500",
+    )
+    browser_fallback = False
+    reader_fallback = False
+    product_href_patterns = (r"/cat/\d+/p/", r"/product/")
 
 
 class YandexLavkaAdapter(RetailSourceAdapter):
